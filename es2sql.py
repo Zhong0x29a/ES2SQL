@@ -18,19 +18,12 @@ class ESObj(object):
     def parse(self, obj):
         self.child_obj = self.get_class(obj)
         
-    def get_class(self, obj):
-        if 'bool' in obj:
-            return Bool(obj['bool'])
-        elif 'term' in obj:
-            return Term(obj['term'])
-        elif 'terms' in obj:
-            return Terms(obj['terms'])
-        elif 'exists' in obj:
-            return Exists(obj['exists'])
-        elif 'nested' in obj:
-            return Nested(obj['nested'])
-        else:
-            raise Exception('ESObj get class error: ', obj)
+    @staticmethod
+    def get_class(obj):
+        for tp in ('bool', 'term', 'terms', 'exists', 'nested'):
+            if tp in obj:
+                return eval(tp.title())(obj[tp]) # Instanlize the class by class name.
+        raise Exception('ESObj get class error: ', obj)
     
     def to_sql(self):
         return self.child_obj.to_sql()
@@ -45,10 +38,10 @@ class Bool(ESObj):
     For should, connection is ' OR '
     """
     def __init__(self, obj):
-        super().__init__(obj)
-
         self.collection = []
         self.type = None
+
+        super().__init__(obj)
         
     def parse(self, obj):
         for tp in ('filter', 'must', 'must_not', 'should'):
@@ -62,12 +55,15 @@ class Bool(ESObj):
 
     def to_sql(self):
         if self.type in ('filter', 'must'):
+            ''' (stmt1 AND stmt2 AND ...) '''
             inner_sql = ' AND '.join([item.to_sql() for item in self.collection])
             return f"({inner_sql})"
         elif self.type == 'must_not':
+            ''' NOT (stmt1 AND stmt2 AND ...) '''
             inner_sql = ' AND '.join([item.to_sql() for item in self.collection])
             return f"NOT ({inner_sql})"
         elif self.type == 'should':
+            ''' (stmt1 OR stmt2 OR ...) '''
             inner_sql = ' OR '.join([item.to_sql() for item in self.collection])
             return f"({inner_sql})"
         else:
@@ -79,14 +75,22 @@ class Term(ESObj):
     term obj. 
     """
     def parse(self, obj):
+        """
+        Handle value type of int, list or str
+        """
         keys = list(obj.keys())
         self.field = keys[0]
         if isinstance(obj[self.field], list):
+            '''  [x1, x2, x3, ...]  '''
             self.value = obj[self.field]
         else:
+            ''' {value: x} '''
             self.value = obj[self.field]['value']
 
     def to_sql(self):
+        """
+        Handle value type of int, list or str
+        """
         # if value is number
         if isinstance(self.value, int):
             return f"({self.field} = {self.value})"
@@ -101,7 +105,7 @@ class Term(ESObj):
 ## TODO: complete for border case
 class Terms(Term):
     """
-    (Undone yet) Terms obj, extend from Term.
+    (Undone yet) Terms obj, now extend from Term.
     """
     def __init__(self, obj):
         super().__init__(obj)
@@ -133,8 +137,13 @@ class Nested(ESObj):
 ''' Test Codes below. '''
 if __name__ == '__main__':
     # read from json file ./es_exp_for_test.json
-    with open('./es_exp_for_test.json', 'r') as f:
-        es_exp = json.load(f)
+    # with open('./es_exp_for_test.json', 'r') as f:
+    #     es_exp = json.load(f)
+    es_exp = '''
+    ...
+'''
+
+    es_exp = json.loads(es_exp)
 
     es_obj = ESObj(es_exp)
     print(es_obj, es_obj.child_obj.collection)
@@ -146,5 +155,4 @@ if __name__ == '__main__':
         f.write(sql)
 
         # format sql, add index space
-
 
