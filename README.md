@@ -1,2 +1,2 @@
 # ES2SQL
-Python version
+Python version Elastic Search to SQL statement tool
